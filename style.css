@@ -277,6 +277,30 @@ tr:last-child td { border-bottom: none; }
 
 #add-material-btn:hover { background: var(--gray-light); }
 
+/* ── Materials Drag ── */
+.mat-th-handle { width: 2rem; }
+
+.mat-drag-handle {
+  cursor: grab;
+  color: var(--gray);
+  font-size: 1.1rem;
+  padding: 0.3rem 0.5rem;
+  user-select: none;
+  text-align: center;
+  width: 2rem;
+}
+
+.mat-drag-handle:active { cursor: grabbing; }
+
+#materials-tbody tr {
+  transition: transform 0.16s ease;
+  will-change: transform;
+}
+
+#materials-tbody tr.mat-dragging {
+  opacity: 0.35;
+}
+
 /* ── Backup ── */
 .backup-section {
   display: flex;

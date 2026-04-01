@@ -240,9 +240,11 @@ function renderMaterialsTable() {
     const hasSpray  = m.groups && m.groups.includes('spray');
 
     const tr = document.createElement('tr');
+    tr.draggable = true;
     tr.dataset.index = idx;
     tr.dataset.name  = m.name;
     tr.innerHTML = `
+      <td class="mat-drag-handle" title="拖曳排序">⠿</td>
       <td><input type="text"   class="mat-input mat-name"     value="${escapeHtml(m.name)}"     placeholder="名稱"></td>
       <td><input type="text"   class="mat-input mat-cat"      value="${escapeHtml(m.category)}" placeholder="類別"></td>
       <td><input type="number" class="mat-input mat-cycle"    value="${m.cycle}"        min="1"></td>
@@ -258,6 +260,94 @@ function renderMaterialsTable() {
       <td><button class="icon-btn mat-del-btn" title="刪除">✕</button></td>
     `;
     tbody.appendChild(tr);
+  });
+}
+
+// ── 資材表格拖拉排序 ──────────────────────────────────────────────
+let matDragIdx = null;
+let _matDragFromHandle = false;
+
+function clearMatDrag() {
+  document.getElementById('materials-tbody').querySelectorAll('tr').forEach(row => {
+    row.classList.remove('mat-dragging');
+    row.style.transform = '';
+  });
+}
+
+function initMatDragDrop() {
+  const tbody = document.getElementById('materials-tbody');
+
+  tbody.addEventListener('mousedown', e => {
+    _matDragFromHandle = !!e.target.closest('.mat-drag-handle');
+  });
+
+  tbody.addEventListener('dragstart', e => {
+    if (!_matDragFromHandle) { e.preventDefault(); return; }
+    const tr = e.target.closest('tr[draggable]');
+    if (!tr) return;
+    matDragIdx = parseInt(tr.dataset.index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', '');
+    requestAnimationFrame(() => tr.classList.add('mat-dragging'));
+  });
+
+  tbody.addEventListener('dragover', e => {
+    e.preventDefault();
+    if (matDragIdx === null) return;
+    const tr = e.target.closest('tr[draggable]');
+    if (!tr) return;
+    const targetIdx = parseInt(tr.dataset.index);
+    if (targetIdx === matDragIdx) return;
+
+    const rect = tr.getBoundingClientRect();
+    const insertPos = e.clientY < rect.top + rect.height / 2 ? targetIdx : targetIdx + 1;
+    const finalPos  = insertPos > matDragIdx ? insertPos - 1 : insertPos;
+
+    const rows = Array.from(tbody.querySelectorAll('tr[draggable]'));
+    const rowH = rows[matDragIdx] ? rows[matDragIdx].offsetHeight : 48;
+
+    rows.forEach((row, i) => {
+      if (i === matDragIdx) return;
+      let shift = 0;
+      if (finalPos > matDragIdx && i > matDragIdx && i <= finalPos)  shift = -rowH;
+      if (finalPos < matDragIdx && i >= finalPos && i < matDragIdx)  shift =  rowH;
+      row.style.transform = shift ? `translateY(${shift}px)` : '';
+    });
+  });
+
+  tbody.addEventListener('dragleave', e => {
+    if (!tbody.contains(e.relatedTarget)) clearMatDrag();
+  });
+
+  tbody.addEventListener('drop', e => {
+    e.preventDefault();
+    if (matDragIdx === null) return;
+    const tr = e.target.closest('tr[draggable]');
+    if (!tr) return;
+
+    const targetIdx = parseInt(tr.dataset.index);
+    const rect      = tr.getBoundingClientRect();
+    const insertPos = e.clientY < rect.top + rect.height / 2 ? targetIdx : targetIdx + 1;
+    const finalPos  = insertPos > matDragIdx ? insertPos - 1 : insertPos;
+
+    clearMatDrag();
+
+    if (finalPos !== matDragIdx) {
+      const mats = loadMaterials();
+      const [removed] = mats.splice(matDragIdx, 1);
+      mats.splice(finalPos, 0, removed);
+      mats.forEach((m, i) => { m.priority = i + 1; });
+      saveMaterials(mats);
+      renderMaterialsTable();
+      render();
+    }
+    matDragIdx = null;
+  });
+
+  tbody.addEventListener('dragend', () => {
+    clearMatDrag();
+    matDragIdx = null;
+    _matDragFromHandle = false;
   });
 }
 
@@ -443,3 +533,4 @@ document.getElementById('add-material-btn').addEventListener('click', () => {
 // ── 初始化 ────────────────────────────────────────────────────────
 render();
 renderMaterialsTable();
+initMatDragDrop();
