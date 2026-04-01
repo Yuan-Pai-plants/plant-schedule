@@ -292,14 +292,12 @@ tr:last-child td { border-bottom: none; }
 
 .mat-drag-handle:active { cursor: grabbing; }
 
-#materials-tbody tr {
-  transition: transform 0.16s ease;
-  will-change: transform;
-}
-
 #materials-tbody tr.mat-dragging {
   opacity: 0.35;
 }
+
+#materials-tbody tr.mat-drop-above { box-shadow: 0 -2px 0 var(--root-color); }
+#materials-tbody tr.mat-drop-below { box-shadow: 0  2px 0 var(--root-color); }
 
 /* ── Backup ── */
 .backup-section {

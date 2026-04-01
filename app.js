@@ -269,7 +269,7 @@ let _matDragFromHandle = false;
 
 function clearMatDrag() {
   document.getElementById('materials-tbody').querySelectorAll('tr').forEach(row => {
-    row.classList.remove('mat-dragging');
+    row.classList.remove('mat-dragging', 'mat-drop-above', 'mat-drop-below');
     row.style.transform = '';
   });
 }
@@ -300,19 +300,11 @@ function initMatDragDrop() {
     if (targetIdx === matDragIdx) return;
 
     const rect = tr.getBoundingClientRect();
-    const insertPos = e.clientY < rect.top + rect.height / 2 ? targetIdx : targetIdx + 1;
-    const finalPos  = insertPos > matDragIdx ? insertPos - 1 : insertPos;
+    const insertBefore = e.clientY < rect.top + rect.height / 2;
 
-    const rows = Array.from(tbody.querySelectorAll('tr[draggable]'));
-    const rowH = rows[matDragIdx] ? rows[matDragIdx].offsetHeight : 48;
-
-    rows.forEach((row, i) => {
-      if (i === matDragIdx) return;
-      let shift = 0;
-      if (finalPos > matDragIdx && i > matDragIdx && i <= finalPos)  shift = -rowH;
-      if (finalPos < matDragIdx && i >= finalPos && i < matDragIdx)  shift =  rowH;
-      row.style.transform = shift ? `translateY(${shift}px)` : '';
-    });
+    tbody.querySelectorAll('.mat-drop-above, .mat-drop-below')
+         .forEach(r => r.classList.remove('mat-drop-above', 'mat-drop-below'));
+    tr.classList.add(insertBefore ? 'mat-drop-above' : 'mat-drop-below');
   });
 
   tbody.addEventListener('dragleave', e => {
