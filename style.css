@@ -233,6 +233,50 @@ tr:last-child td { border-bottom: none; }
 .item-cat  { font-size: 0.72rem; color: var(--gray); }
 
 
+/* ── Materials Table ── */
+.mat-input {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.28rem 0.45rem;
+  font-size: 0.82rem;
+  background: var(--bg);
+  width: 100%;
+  min-width: 0;
+}
+
+.mat-input[type="number"] { width: 4.5rem; }
+
+.mat-date {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.28rem 0.45rem;
+  font-size: 0.82rem;
+  background: var(--bg);
+}
+
+.mat-date:disabled { opacity: 0.3; }
+
+.mat-date-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+
+#add-material-btn {
+  margin-top: 0.6rem;
+  background: var(--card);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--gray);
+  width: 100%;
+}
+
+#add-material-btn:hover { background: var(--gray-light); }
+
 /* ── Backup ── */
 .backup-section {
   display: flex;

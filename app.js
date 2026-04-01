@@ -1,5 +1,5 @@
-// ── 資材資料庫（固定） ──────────────────────────────────────────
-const MATERIALS = [
+// ── 資材資料庫（預設值，可由 localStorage 覆蓋） ──────────────────
+const DEFAULT_MATERIALS = [
   {
     priority: 1, name: '摩西菌根菌', category: '真菌',
     cycle: 90, safeInterval: 14,
@@ -98,6 +98,21 @@ function saveData(data) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
+// ── 資材 LocalStorage ─────────────────────────────────────────────
+const MATERIALS_KEY = 'plantMaterials';
+
+function loadMaterials() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(MATERIALS_KEY));
+    if (Array.isArray(raw) && raw.length > 0) return raw;
+  } catch {}
+  return DEFAULT_MATERIALS.map(m => ({ ...m }));
+}
+
+function saveMaterials(mats) {
+  localStorage.setItem(MATERIALS_KEY, JSON.stringify(mats));
+}
+
 // ── 排程演算法（每組獨立執行） ─────────────────────────────────────
 //
 // Phase 1: 原始 nextDate
@@ -118,7 +133,7 @@ function saveData(data) {
 function computeGroupSchedule(groupKey, data) {
   const t              = today();
   const lastAppliedMap = (data.lastApplied && data.lastApplied[groupKey]) || {};
-  const items          = MATERIALS.filter(m => m.groups.includes(groupKey));
+  const items          = loadMaterials().filter(m => m.groups && m.groups.includes(groupKey));
 
   // Phase 1
   const entries = items.map(m => {
@@ -205,6 +220,47 @@ function render() {
   renderGroup('spray', data);
 }
 
+// ── 資材管理表格 ──────────────────────────────────────────────────
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function renderMaterialsTable() {
+  const mats  = loadMaterials();
+  const data  = loadData();
+  const tbody = document.getElementById('materials-tbody');
+  tbody.innerHTML = '';
+
+  mats.forEach((m, idx) => {
+    const lastRoot  = data.lastApplied.root[m.name]  || '';
+    const lastSpray = data.lastApplied.spray[m.name] || '';
+    const hasRoot   = m.groups && m.groups.includes('root');
+    const hasSpray  = m.groups && m.groups.includes('spray');
+
+    const tr = document.createElement('tr');
+    tr.dataset.index = idx;
+    tr.dataset.name  = m.name;
+    tr.innerHTML = `
+      <td><input type="text"   class="mat-input mat-name"     value="${escapeHtml(m.name)}"     placeholder="名稱"></td>
+      <td><input type="text"   class="mat-input mat-cat"      value="${escapeHtml(m.category)}" placeholder="類別"></td>
+      <td><input type="number" class="mat-input mat-cycle"    value="${m.cycle}"        min="1"></td>
+      <td><input type="number" class="mat-input mat-interval" value="${m.safeInterval}" min="0"></td>
+      <td><label class="mat-date-label">
+        <input type="checkbox" class="mat-root" ${hasRoot ? 'checked' : ''}>
+        <input type="date" class="mat-date mat-last-root" value="${lastRoot}" ${!hasRoot ? 'disabled' : ''}>
+      </label></td>
+      <td><label class="mat-date-label">
+        <input type="checkbox" class="mat-spray" ${hasSpray ? 'checked' : ''}>
+        <input type="date" class="mat-date mat-last-spray" value="${lastSpray}" ${!hasSpray ? 'disabled' : ''}>
+      </label></td>
+      <td><button class="icon-btn mat-del-btn" title="刪除">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
 // ── 事件（統一用委派避免重複綁定） ────────────────────────────────
 document.getElementById('app').addEventListener('click', e => {
   // 確認送出
@@ -222,6 +278,7 @@ document.getElementById('app').addEventListener('click', e => {
     saveData(data);
     document.getElementById(`date-${group}`).value = '';
     render();
+    renderMaterialsTable();
     return;
   }
 
@@ -255,7 +312,7 @@ document.querySelector('.modal-backdrop').addEventListener('click', () => {
 
 // 匯出
 document.getElementById('export-btn').addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify(loadData(), null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({ ...loadData(), plantMaterials: loadMaterials() }, null, 2)], { type: 'application/json' });
   const a    = document.createElement('a');
   a.href     = URL.createObjectURL(blob);
   a.download = `plant-schedule-${toInputStr(today())}.json`;
@@ -273,8 +330,13 @@ document.getElementById('import-input').addEventListener('change', e => {
       if (typeof data !== 'object' || typeof data.lastApplied !== 'object') throw new Error();
       data.lastApplied.root  = data.lastApplied.root  || {};
       data.lastApplied.spray = data.lastApplied.spray || {};
-      saveData(data);
+      if (Array.isArray(data.plantMaterials) && data.plantMaterials.length) {
+        saveMaterials(data.plantMaterials);
+      }
+      const { plantMaterials, ...scheduleData } = data;
+      saveData(scheduleData);
       render();
+      renderMaterialsTable();
       alert('匯入成功！');
     } catch {
       alert('匯入失敗：檔案格式不正確。');
@@ -284,5 +346,100 @@ document.getElementById('import-input').addEventListener('change', e => {
   reader.readAsText(file);
 });
 
+// 資材表格 — 編輯
+document.getElementById('materials-tbody').addEventListener('change', e => {
+  const tr = e.target.closest('tr');
+  if (!tr) return;
+
+  const idx     = parseInt(tr.dataset.index);
+  const oldName = tr.dataset.name;
+  const mats    = loadMaterials();
+  const data    = loadData();
+
+  const newName = tr.querySelector('.mat-name').value.trim();
+
+  // 名稱變更時同步 lastApplied key
+  if (newName && newName !== oldName) {
+    ['root', 'spray'].forEach(g => {
+      if (data.lastApplied[g][oldName] !== undefined) {
+        data.lastApplied[g][newName] = data.lastApplied[g][oldName];
+        delete data.lastApplied[g][oldName];
+      }
+    });
+    tr.dataset.name = newName;
+  }
+
+  const hasRoot  = tr.querySelector('.mat-root').checked;
+  const hasSpray = tr.querySelector('.mat-spray').checked;
+  const groups   = [...(hasRoot ? ['root'] : []), ...(hasSpray ? ['spray'] : [])];
+  const name     = newName || oldName;
+
+  mats[idx] = {
+    ...mats[idx],
+    name,
+    category:     tr.querySelector('.mat-cat').value.trim(),
+    cycle:        Math.max(1, parseInt(tr.querySelector('.mat-cycle').value)    || 1),
+    safeInterval: Math.max(0, parseInt(tr.querySelector('.mat-interval').value) || 0),
+    groups,
+    priority: idx + 1,
+  };
+
+  // 上次施作日期
+  const lastRootVal  = tr.querySelector('.mat-last-root').value;
+  const lastSprayVal = tr.querySelector('.mat-last-spray').value;
+  if (hasRoot)  { if (lastRootVal)  data.lastApplied.root[name]  = lastRootVal;  else delete data.lastApplied.root[name];  }
+  else            { delete data.lastApplied.root[name]; }
+  if (hasSpray) { if (lastSprayVal) data.lastApplied.spray[name] = lastSprayVal; else delete data.lastApplied.spray[name]; }
+  else            { delete data.lastApplied.spray[name]; }
+
+  // 同步 disabled 狀態
+  tr.querySelector('.mat-last-root').disabled  = !hasRoot;
+  tr.querySelector('.mat-last-spray').disabled = !hasSpray;
+
+  saveMaterials(mats);
+  saveData(data);
+  render();
+});
+
+// 資材表格 — 刪除
+document.getElementById('materials-tbody').addEventListener('click', e => {
+  const btn = e.target.closest('.mat-del-btn');
+  if (!btn) return;
+
+  const tr   = btn.closest('tr');
+  const idx  = parseInt(tr.dataset.index);
+  const name = tr.dataset.name;
+  const mats = loadMaterials();
+
+  mats.splice(idx, 1);
+  mats.forEach((m, i) => { m.priority = i + 1; });
+
+  const data = loadData();
+  delete data.lastApplied.root[name];
+  delete data.lastApplied.spray[name];
+
+  saveMaterials(mats);
+  saveData(data);
+  renderMaterialsTable();
+  render();
+});
+
+// 資材表格 — 新增
+document.getElementById('add-material-btn').addEventListener('click', () => {
+  const mats = loadMaterials();
+  mats.push({
+    priority: mats.length + 1,
+    name: '', category: '',
+    cycle: 14, safeInterval: 3,
+    groups: ['root', 'spray'],
+    methods: {},
+  });
+  saveMaterials(mats);
+  renderMaterialsTable();
+  const rows = document.querySelectorAll('#materials-tbody tr');
+  if (rows.length) rows[rows.length - 1].querySelector('.mat-name').focus();
+});
+
 // ── 初始化 ────────────────────────────────────────────────────────
 render();
+renderMaterialsTable();
