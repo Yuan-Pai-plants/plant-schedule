@@ -126,9 +126,10 @@ function saveMaterials(mats) {
 //   nextDate 升冪；同日依 priority 升冪
 //   （priority 對從未施作的項目有排序意義；已施作項目靠 nextDate 自然排）
 //
-// Phase 4: 鏈式遞延
-//   順序走過每個項目：item[i].nextDate >= item[i-1].nextDate + item[i-1].safeInterval
-//   即「前一個項目若在其 nextDate 施作，其安全間隔會影響下一個」
+// Phase 4: 迭代模擬
+//   每輪挑出 nextDate 最早的項目，模擬施作它並記錄安全間隔封鎖，
+//   重新計算剩餘項目的 nextDate 後再排序，如此反覆。
+//   解決單次鏈式遞延忽略「施作後可能重新排序」的問題。
 //
 function computeGroupSchedule(groupKey, data) {
   const t              = today();
@@ -153,20 +154,37 @@ function computeGroupSchedule(groupKey, data) {
     });
   });
 
-  // Phase 3
+  // Phase 3（初始排序，為迭代模擬提供起始順序）
   entries.sort((a, b) => {
     const diff = a.nextDate - b.nextDate;
     return diff !== 0 ? diff : a.priority - b.priority;
   });
 
-  // Phase 4
-  for (let i = 1; i < entries.length; i++) {
-    const prev     = entries[i - 1];
-    const chainMin = addDays(prev.nextDate, prev.safeInterval);
-    if (entries[i].nextDate < chainMin) entries[i].nextDate = new Date(chainMin);
+  // Phase 4: 迭代模擬
+  const schedule  = [];
+  const remaining = entries.map(e => ({ ...e, baseNext: new Date(e.nextDate) }));
+  const simBlocks = [];
+
+  while (remaining.length) {
+    // 從 baseNext 重算，套用所有模擬封鎖
+    remaining.forEach(item => {
+      item.nextDate = new Date(item.baseNext);
+      simBlocks.forEach(b => {
+        if (b.name !== item.name && item.nextDate < b.until)
+          item.nextDate = new Date(b.until);
+      });
+    });
+
+    // 排序：nextDate 升冪，同日依 priority
+    remaining.sort((a, b) => (a.nextDate - b.nextDate) || (a.priority - b.priority));
+
+    // 取出第一個，加入模擬封鎖
+    const next = remaining.shift();
+    schedule.push(next);
+    simBlocks.push({ name: next.name, until: addDays(next.nextDate, next.safeInterval) });
   }
 
-  return entries;
+  return schedule;
 }
 
 // ── 渲染 ──────────────────────────────────────────────────────────
