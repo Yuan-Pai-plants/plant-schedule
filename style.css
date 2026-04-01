@@ -1,0 +1,325 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* 根灌：綠 */
+  --root-color:  #40916c;
+  --root-pale:   #d8f3dc;
+  /* 噴灑：青綠 */
+  --spray-color: #2a9d8f;
+  --spray-pale:  #ccf0ec;
+  /* 共用 */
+  --gray:        #6c757d;
+  --gray-light:  #e9ecef;
+  --text:        #1b1b1b;
+  --bg:          #f4faf6;
+  --card:        #ffffff;
+  --border:      #dee2e6;
+  --red-dark:    #58151c;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans TC', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 3rem;
+}
+
+/* ── Header ── */
+header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.plant-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--root-color);
+  flex: 1;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.plant-name.empty {
+  font-size: 0.95rem;
+  font-weight: 400;
+  font-style: italic;
+  color: var(--gray);
+}
+
+.icon-btn {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.3rem 0.55rem;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.icon-btn:hover { background: var(--gray-light); }
+
+/* ── Parallel layout ── */
+.groups-row {
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-start;
+}
+
+.group-section {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .groups-row { flex-direction: column; }
+}
+
+/* ── Group Headings ── */
+.group-heading {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--gray);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.group-heading::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 1em;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.group-root  .group-heading::before { background: var(--root-color);  }
+.group-spray .group-heading::before { background: var(--spray-color); }
+
+/* ── Action Card ── */
+.action-card {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 1.25rem 1.4rem;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+  border-left: 5px solid;
+  margin-bottom: 0.9rem;
+}
+
+.group-root  .action-card { border-left-color: var(--root-color);  }
+.group-spray .action-card { border-left-color: var(--spray-color); }
+
+.current-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--gray);
+  margin-bottom: 0.2rem;
+}
+
+.current-name {
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.15;
+  margin-bottom: 0.2rem;
+}
+
+.group-root  .current-name { color: var(--root-color);  }
+.group-spray .current-name { color: var(--spray-color); }
+
+.current-earliest {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #c17a2a;
+  min-height: 1.2em;
+  margin-bottom: 0.8rem;
+}
+
+.date-input-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.date-input-row label {
+  font-size: 0.82rem;
+  white-space: nowrap;
+  color: var(--gray);
+}
+
+.date-input-row input[type="date"] {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.875rem;
+  flex: 1;
+  min-width: 130px;
+  background: var(--bg);
+}
+
+.confirm-btn {
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.42rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.group-root  .confirm-btn { background: var(--root-color);  }
+.group-spray .confirm-btn { background: var(--spray-color); }
+.group-root  .confirm-btn:hover { background: #2d6a4f; }
+.group-spray .confirm-btn:hover { background: #21867a; }
+
+/* ── Table ── */
+.table-label {
+  font-size: 0.78rem;
+  color: var(--gray);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.45rem;
+  margin-top: 0.9rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.06);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card);
+}
+
+th {
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.group-root  th { background: var(--root-pale);  color: #2d6a4f; }
+.group-spray th { background: var(--spray-pale); color: #1f7268; }
+
+td {
+  padding: 0.6rem 0.7rem;
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+tr:last-child td { border-bottom: none; }
+
+.item-name { font-weight: 600; }
+.item-cat  { font-size: 0.72rem; color: var(--gray); }
+
+
+/* ── Backup ── */
+.backup-section {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.backup-section button,
+.import-label {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--gray);
+  display: inline-flex;
+  align-items: center;
+}
+
+.backup-section button:hover,
+.import-label:hover { background: var(--gray-light); }
+
+.import-label input[type="file"] { display: none; }
+
+/* ── Modal ── */
+.modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal.hidden { display: none; }
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+  position: relative;
+  background: var(--card);
+  border-radius: 16px;
+  padding: 1.5rem;
+  width: 90%;
+  max-width: 360px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+
+.modal-content h3 {
+  color: var(--root-color);
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
+.modal-content input[type="text"] {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  background: var(--bg);
+}
+
+.modal-content input[type="text"]:focus { outline: 2px solid #74c69d; }
+
+.modal-buttons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.modal-buttons button {
+  padding: 0.45rem 1.2rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+#save-name-btn   { background: var(--root-color); color: #fff; font-weight: 600; }
+#cancel-name-btn { background: var(--gray-light); color: var(--text); }
+#save-name-btn:hover   { background: #2d6a4f; }
+#cancel-name-btn:hover { background: var(--border); }

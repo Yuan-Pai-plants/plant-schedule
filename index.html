@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>植物施作排程</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- 標頭 -->
+    <header>
+      <div id="plant-name-display" class="plant-name empty">點擊設定植物名稱</div>
+      <button id="edit-name-btn" class="icon-btn" title="編輯植物名稱">✏️</button>
+    </header>
+
+    <!-- 根灌 / 噴灑 並排 -->
+    <div class="groups-row">
+
+      <!-- 根灌區 -->
+      <section class="group-section group-root">
+        <h2 class="group-heading">根灌</h2>
+
+        <div class="action-card">
+          <div class="current-label">目前建議施作</div>
+          <div class="current-name" id="name-root">—</div>
+          <div class="current-earliest" id="earliest-root"></div>
+          <div class="date-input-row">
+            <label for="date-root">最近一次施作日期</label>
+            <input type="date" id="date-root">
+            <button class="confirm-btn" data-group="root">確認送出</button>
+          </div>
+        </div>
+
+        <p class="table-label">完整排程</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>項目</th>
+                <th>上次施作</th>
+                <th>下次可施作</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-root"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 噴灑區 -->
+      <section class="group-section group-spray">
+        <h2 class="group-heading">噴灑</h2>
+
+        <div class="action-card">
+          <div class="current-label">目前建議施作</div>
+          <div class="current-name" id="name-spray">—</div>
+          <div class="current-earliest" id="earliest-spray"></div>
+          <div class="date-input-row">
+            <label for="date-spray">最近一次施作日期</label>
+            <input type="date" id="date-spray">
+            <button class="confirm-btn" data-group="spray">確認送出</button>
+          </div>
+        </div>
+
+        <p class="table-label">完整排程</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>項目</th>
+                <th>上次施作</th>
+                <th>下次可施作</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-spray"></tbody>
+          </table>
+        </div>
+      </section>
+
+    </div><!-- .groups-row -->
+
+    <!-- 備份 -->
+    <section class="backup-section">
+      <button id="export-btn">⬇ 備份資料</button>
+      <label class="import-label">
+        ⬆ 匯入資料
+        <input type="file" id="import-input" accept=".json">
+      </label>
+    </section>
+
+  </div>
+
+  <!-- 植物名稱 Modal -->
+  <div id="name-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <h3>植物名稱</h3>
+      <input type="text" id="plant-name-input" placeholder="例如：龜背芋" maxlength="20">
+      <div class="modal-buttons">
+        <button id="cancel-name-btn">取消</button>
+        <button id="save-name-btn">儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
