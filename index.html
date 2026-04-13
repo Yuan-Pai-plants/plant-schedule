@@ -9,6 +9,14 @@
 <body>
   <div id="app">
 
+    <!-- 頁籤列 -->
+    <div class="tab-bar">
+      <div class="tab-scroll" id="tab-scroll">
+        <!-- 動態產生頁籤 -->
+      </div>
+      <button class="tab-add-btn" id="add-tab-btn" title="新增植物頁籤">＋</button>
+    </div>
+
     <!-- 標頭 -->
     <header>
       <div id="plant-name-display" class="plant-name empty">點擊設定植物名稱</div>
@@ -123,6 +131,19 @@
       <div class="modal-buttons">
         <button id="cancel-name-btn">取消</button>
         <button id="save-name-btn">儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 刪除確認 Modal -->
+  <div id="delete-tab-modal" class="modal hidden">
+    <div class="modal-backdrop delete-backdrop"></div>
+    <div class="modal-content delete-modal-content">
+      <h3>⚠️ 確認刪除</h3>
+      <p id="delete-tab-msg" class="delete-msg">確定要刪除此頁籤及其所有資料嗎？</p>
+      <div class="modal-buttons">
+        <button id="cancel-delete-btn">取消</button>
+        <button id="confirm-delete-btn" class="danger-btn">刪除</button>
       </div>
     </div>
   </div>

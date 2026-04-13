@@ -73,14 +73,93 @@ function addDays(d, n) {
   return r;
 }
 
-// ── LocalStorage ─────────────────────────────────────────────────
-const STORAGE_KEY = 'plantSchedule';
+// ── 多頁籤管理 ─────────────────────────────────────────────────────
+const TABS_META_KEY = 'plantTabs';     // 儲存頁籤清單 + activeId
+const TAB_PREFIX    = 'plantTab_';     // 每個頁籤的 schedule data prefix
+const MAT_PREFIX    = 'plantMat_';     // 每個頁籤的 materials prefix
+
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function loadTabsMeta() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(TABS_META_KEY));
+    if (raw && Array.isArray(raw.tabs) && raw.tabs.length > 0) return raw;
+  } catch {}
+  return null;
+}
+
+function saveTabsMeta(meta) {
+  localStorage.setItem(TABS_META_KEY, JSON.stringify(meta));
+}
+
+// 遷移舊版單植物資料到第一個頁籤
+function migrateFromLegacy() {
+  const legacy = localStorage.getItem('plantSchedule');
+  const legacyMats = localStorage.getItem('plantMaterials');
+
+  const firstId = generateId();
+  let plantName = '';
+  let scheduleData = emptyData();
+  let materialsData = null;
+
+  if (legacy) {
+    try {
+      const parsed = JSON.parse(legacy);
+      plantName = parsed.plantName || '';
+      scheduleData = {
+        plantName,
+        lastApplied: {
+          root:  (parsed.lastApplied && parsed.lastApplied.root)  || {},
+          spray: (parsed.lastApplied && parsed.lastApplied.spray) || {},
+        },
+      };
+    } catch {}
+  }
+  if (legacyMats) {
+    try {
+      const parsed = JSON.parse(legacyMats);
+      if (Array.isArray(parsed) && parsed.length > 0) materialsData = parsed;
+    } catch {}
+  }
+
+  const meta = {
+    activeId: firstId,
+    tabs: [{ id: firstId, name: plantName || '植物 1' }],
+  };
+  saveTabsMeta(meta);
+  localStorage.setItem(TAB_PREFIX + firstId, JSON.stringify(scheduleData));
+  if (materialsData) {
+    localStorage.setItem(MAT_PREFIX + firstId, JSON.stringify(materialsData));
+  }
+
+  // 清除舊 key
+  localStorage.removeItem('plantSchedule');
+  localStorage.removeItem('plantMaterials');
+
+  return meta;
+}
+
+function ensureTabsMeta() {
+  let meta = loadTabsMeta();
+  if (!meta) {
+    // 嘗試遷移舊版
+    meta = migrateFromLegacy();
+  }
+  return meta;
+}
+
+// ── 目前頁籤的 Data / Materials ─────────────────────────────────────
+function getActiveTabId() {
+  return ensureTabsMeta().activeId;
+}
 
 function loadData() {
+  const tabId = getActiveTabId();
   try {
-    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    const raw = JSON.parse(localStorage.getItem(TAB_PREFIX + tabId));
     if (!raw) return emptyData();
-    // 確保巢狀結構存在（相容舊版資料）
     if (!raw.lastApplied || !raw.lastApplied.root) {
       return { plantName: raw.plantName || '', lastApplied: { root: {}, spray: {} } };
     }
@@ -95,22 +174,134 @@ function emptyData() {
 }
 
 function saveData(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  const tabId = getActiveTabId();
+  localStorage.setItem(TAB_PREFIX + tabId, JSON.stringify(data));
+
+  // 同步頁籤名稱
+  const meta = ensureTabsMeta();
+  const tab = meta.tabs.find(t => t.id === tabId);
+  if (tab && data.plantName) {
+    tab.name = data.plantName;
+    saveTabsMeta(meta);
+    renderTabs();
+  }
 }
 
-// ── 資材 LocalStorage ─────────────────────────────────────────────
-const MATERIALS_KEY = 'plantMaterials';
-
 function loadMaterials() {
+  const tabId = getActiveTabId();
   try {
-    const raw = JSON.parse(localStorage.getItem(MATERIALS_KEY));
+    const raw = JSON.parse(localStorage.getItem(MAT_PREFIX + tabId));
     if (Array.isArray(raw) && raw.length > 0) return raw;
   } catch {}
   return DEFAULT_MATERIALS.map(m => ({ ...m }));
 }
 
 function saveMaterials(mats) {
-  localStorage.setItem(MATERIALS_KEY, JSON.stringify(mats));
+  const tabId = getActiveTabId();
+  localStorage.setItem(MAT_PREFIX + tabId, JSON.stringify(mats));
+}
+
+// ── 頁籤操作 ──────────────────────────────────────────────────────
+function addTab() {
+  const meta = ensureTabsMeta();
+  const newId = generateId();
+  const n = meta.tabs.length + 1;
+  meta.tabs.push({ id: newId, name: `植物 ${n}` });
+  meta.activeId = newId;
+  saveTabsMeta(meta);
+  localStorage.setItem(TAB_PREFIX + newId, JSON.stringify(emptyData()));
+  fullRender();
+}
+
+function switchTab(tabId) {
+  const meta = ensureTabsMeta();
+  if (meta.activeId === tabId) return;
+  meta.activeId = tabId;
+  saveTabsMeta(meta);
+  fullRender();
+}
+
+let _pendingDeleteId = null;
+
+function requestDeleteTab(tabId) {
+  const meta = ensureTabsMeta();
+  if (meta.tabs.length <= 1) return; // 至少保留一個頁籤
+
+  const tab = meta.tabs.find(t => t.id === tabId);
+  const name = tab ? tab.name : '此頁籤';
+  document.getElementById('delete-tab-msg').textContent =
+    `確定要刪除「${name}」及其所有資料嗎？此操作無法復原。`;
+  _pendingDeleteId = tabId;
+  document.getElementById('delete-tab-modal').classList.remove('hidden');
+}
+
+function confirmDeleteTab() {
+  if (!_pendingDeleteId) return;
+  const meta = ensureTabsMeta();
+  const idx = meta.tabs.findIndex(t => t.id === _pendingDeleteId);
+  if (idx === -1) return;
+
+  // 清除該頁籤的資料
+  localStorage.removeItem(TAB_PREFIX + _pendingDeleteId);
+  localStorage.removeItem(MAT_PREFIX + _pendingDeleteId);
+  meta.tabs.splice(idx, 1);
+
+  // 若刪除的是 active tab，切到前一個或後一個
+  if (meta.activeId === _pendingDeleteId) {
+    meta.activeId = meta.tabs[Math.min(idx, meta.tabs.length - 1)].id;
+  }
+  saveTabsMeta(meta);
+
+  _pendingDeleteId = null;
+  document.getElementById('delete-tab-modal').classList.add('hidden');
+  fullRender();
+}
+
+function cancelDeleteTab() {
+  _pendingDeleteId = null;
+  document.getElementById('delete-tab-modal').classList.add('hidden');
+}
+
+// ── 渲染頁籤列 ─────────────────────────────────────────────────────
+function renderTabs() {
+  const meta = ensureTabsMeta();
+  const scroll = document.getElementById('tab-scroll');
+  scroll.innerHTML = '';
+
+  meta.tabs.forEach(tab => {
+    const isActive = tab.id === meta.activeId;
+    const tabEl = document.createElement('div');
+    tabEl.className = `tab-item${isActive ? ' tab-active' : ''}`;
+    tabEl.dataset.tabId = tab.id;
+
+    const label = document.createElement('span');
+    label.className = 'tab-label';
+    label.textContent = tab.name || '未命名';
+    label.addEventListener('click', () => switchTab(tab.id));
+
+    tabEl.appendChild(label);
+
+    // 僅在有超過一個頁籤時顯示刪除按鈕
+    if (meta.tabs.length > 1) {
+      const delBtn = document.createElement('button');
+      delBtn.className = 'tab-del-btn';
+      delBtn.title = '刪除此頁籤';
+      delBtn.textContent = '✕';
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        requestDeleteTab(tab.id);
+      });
+      tabEl.appendChild(delBtn);
+    }
+
+    scroll.appendChild(tabEl);
+  });
+
+  // 確保 active tab 可見
+  requestAnimationFrame(() => {
+    const activeEl = scroll.querySelector('.tab-active');
+    if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+  });
 }
 
 // ── 排程演算法（每組獨立執行） ─────────────────────────────────────
@@ -361,6 +552,13 @@ function initMatDragDrop() {
   });
 }
 
+// ── fullRender: 一次重繪所有（頁籤切換後呼叫） ──────────────────────
+function fullRender() {
+  renderTabs();
+  render();
+  renderMaterialsTable();
+}
+
 // ── 事件（統一用委派避免重複綁定） ────────────────────────────────
 document.getElementById('app').addEventListener('click', e => {
   // 確認送出
@@ -384,6 +582,12 @@ document.getElementById('app').addEventListener('click', e => {
 
 });
 
+// 頁籤操作
+document.getElementById('add-tab-btn').addEventListener('click', addTab);
+document.getElementById('confirm-delete-btn').addEventListener('click', confirmDeleteTab);
+document.getElementById('cancel-delete-btn').addEventListener('click', cancelDeleteTab);
+document.querySelector('.delete-backdrop').addEventListener('click', cancelDeleteTab);
+
 // 植物名稱
 function openNameModal() {
   document.getElementById('plant-name-input').value = loadData().plantName || '';
@@ -399,6 +603,7 @@ document.getElementById('save-name-btn').addEventListener('click', () => {
   saveData(data);
   document.getElementById('name-modal').classList.add('hidden');
   render();
+  renderTabs(); // 同步更新頁籤名稱
 });
 document.getElementById('cancel-name-btn').addEventListener('click', () => {
   document.getElementById('name-modal').classList.add('hidden');
@@ -406,13 +611,36 @@ document.getElementById('cancel-name-btn').addEventListener('click', () => {
 document.getElementById('plant-name-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('save-name-btn').click();
 });
-document.querySelector('.modal-backdrop').addEventListener('click', () => {
+document.querySelector('.modal-backdrop:not(.delete-backdrop)').addEventListener('click', () => {
   document.getElementById('name-modal').classList.add('hidden');
 });
 
-// 匯出
+// 匯出（包含所有頁籤）
 document.getElementById('export-btn').addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify({ ...loadData(), plantMaterials: loadMaterials() }, null, 2)], { type: 'application/json' });
+  const meta = ensureTabsMeta();
+  const exportData = {
+    _version: 2,
+    _exportDate: toInputStr(today()),
+    tabs: meta.tabs.map(tab => {
+      let scheduleData = emptyData();
+      let materialsData = null;
+      try {
+        scheduleData = JSON.parse(localStorage.getItem(TAB_PREFIX + tab.id)) || emptyData();
+      } catch {}
+      try {
+        const raw = JSON.parse(localStorage.getItem(MAT_PREFIX + tab.id));
+        if (Array.isArray(raw) && raw.length > 0) materialsData = raw;
+      } catch {}
+      return {
+        id: tab.id,
+        name: tab.name,
+        schedule: scheduleData,
+        materials: materialsData,
+      };
+    }),
+    activeId: meta.activeId,
+  };
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
   const a    = document.createElement('a');
   a.href     = URL.createObjectURL(blob);
   a.download = `plant-schedule-${toInputStr(today())}.json`;
@@ -427,17 +655,56 @@ document.getElementById('import-input').addEventListener('change', e => {
   reader.onload = ev => {
     try {
       const data = JSON.parse(ev.target.result);
-      if (typeof data !== 'object' || typeof data.lastApplied !== 'object') throw new Error();
-      data.lastApplied.root  = data.lastApplied.root  || {};
-      data.lastApplied.spray = data.lastApplied.spray || {};
-      if (Array.isArray(data.plantMaterials) && data.plantMaterials.length) {
-        saveMaterials(data.plantMaterials);
+
+      // 新版多頁籤格式
+      if (data._version === 2 && Array.isArray(data.tabs)) {
+        // 清除現有頁籤資料
+        const oldMeta = loadTabsMeta();
+        if (oldMeta) {
+          oldMeta.tabs.forEach(t => {
+            localStorage.removeItem(TAB_PREFIX + t.id);
+            localStorage.removeItem(MAT_PREFIX + t.id);
+          });
+        }
+
+        const newMeta = {
+          activeId: data.activeId || data.tabs[0].id,
+          tabs: data.tabs.map(t => ({ id: t.id, name: t.name })),
+        };
+        saveTabsMeta(newMeta);
+        data.tabs.forEach(t => {
+          localStorage.setItem(TAB_PREFIX + t.id, JSON.stringify(t.schedule || emptyData()));
+          if (t.materials) localStorage.setItem(MAT_PREFIX + t.id, JSON.stringify(t.materials));
+        });
+        fullRender();
+        alert('匯入成功！');
+        e.target.value = '';
+        return;
       }
-      const { plantMaterials, ...scheduleData } = data;
-      saveData(scheduleData);
-      render();
-      renderMaterialsTable();
-      alert('匯入成功！');
+
+      // 舊版單植物格式相容
+      if (typeof data === 'object' && typeof data.lastApplied === 'object') {
+        data.lastApplied.root  = data.lastApplied.root  || {};
+        data.lastApplied.spray = data.lastApplied.spray || {};
+
+        // 儲存到目前作用的頁籤
+        const scheduleData = {
+          plantName: data.plantName || '',
+          lastApplied: data.lastApplied,
+        };
+        saveData(scheduleData);
+
+        if (Array.isArray(data.plantMaterials) && data.plantMaterials.length) {
+          saveMaterials(data.plantMaterials);
+        }
+
+        fullRender();
+        alert('匯入成功！（舊版格式已匯入至目前頁籤）');
+        e.target.value = '';
+        return;
+      }
+
+      throw new Error('格式不正確');
     } catch {
       alert('匯入失敗：檔案格式不正確。');
     }
@@ -541,6 +808,6 @@ document.getElementById('add-material-btn').addEventListener('click', () => {
 });
 
 // ── 初始化 ────────────────────────────────────────────────────────
-render();
-renderMaterialsTable();
+ensureTabsMeta();
+fullRender();
 initMatDragDrop();
